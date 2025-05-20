@@ -1,85 +1,87 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <map>
+#include <iomanip> // pro std::setprecision
 #include <fstream>
-#include "nlohmann/json.hpp"
+#include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
-void print_menu() {
-    std::cout << "Vyber jazyk / Sprache waehlen / Choose language:\n";
-    std::cout << "1 - Cesky\n2 - Deutsch\n3 - English\n";
-    std::cout << "Tva volba / Deine Wahl / Your choice: ";
-}
-
 int main() {
-    int lang = 0;
-    print_menu();
-    std::cin >> lang;
+    std::map<std::string, std::map<std::string, std::string>> translations = {
+        {"en", {{"choose_language", "Choose language: 1 - Czech, 2 - German, 3 - English"},
+                {"enter_count", "Enter number of probabilities:"},
+                {"enter_prob", "Enter probability #%d (in %%):"},
+                {"result", "The probability of all events happening together is:"},
+                {"json_saved", "Result saved to result.json"},
+                {"invalid_choice", "Invalid choice, defaulting to Czech."}}},
+        {"de", {{"choose_language", "Sprache wählen: 1 - Tschechisch, 2 - Deutsch, 3 - Englisch"},
+                {"enter_count", "Geben Sie die Anzahl der Wahrscheinlichkeiten ein:"},
+                {"enter_prob", "Geben Sie die Wahrscheinlichkeit #%d (in %%):"},
+                {"result", "Die Wahrscheinlichkeit, dass alle Ereignisse zusammen eintreten, beträgt:"},
+                {"json_saved", "Ergebnis in result.json gespeichert"},
+                {"invalid_choice", "Ungültige Auswahl, Standard ist Tschechisch."}}},
+        {"cz", {{"choose_language", "Vyber jazyk: 1 - čeština, 2 - němčina, 3 - angličtina"},
+                {"enter_count", "Zadej počet pravděpodobností:"},
+                {"enter_prob", "Zadej pravděpodobnost č. %d (v %%):"},
+                {"result", "Pravděpodobnost, že všechny události nastanou společně, je:"},
+                {"json_saved", "Výsledek uložen do result.json"},
+                {"invalid_choice", "Neplatná volba, použita čeština."}}}
+    };
 
-    std::string prompt_count, prompt_prob, error_input, output_message;
-
-    switch (lang) {
-        case 1:
-            prompt_count = "Zadej pocet pravdepodobnosti:";
-            prompt_prob = "Zadej pravdepodobnost v procentech (0-100):";
-            error_input = "Neplatny vstup. Zadej cislo mezi 0 a 100.";
-            output_message = "Vysledek ulozen do result.json";
-            break;
-        case 2:
-            prompt_count = "Gib die Anzahl der Wahrscheinlichkeiten ein:";
-            prompt_prob = "Gib eine Wahrscheinlichkeit in Prozent ein (0-100):";
-            error_input = "Ungueltige Eingabe. Bitte eine Zahl zwischen 0 und 100 eingeben.";
-            output_message = "Ergebnis in result.json gespeichert.";
-            break;
-        case 3:
-            prompt_count = "Enter the number of probabilities:";
-            prompt_prob = "Enter a probability in percent (0-100):";
-            error_input = "Invalid input. Please enter a number between 0 and 100.";
-            output_message = "Result saved in result.json";
-            break;
+    std::string lang_code = "cz";
+    int lang_choice;
+    std::cout << translations["cz"]["choose_language"] << std::endl;
+    std::cin >> lang_choice;
+    switch(lang_choice) {
+        case 1: lang_code = "cz"; break;
+        case 2: lang_code = "de"; break;
+        case 3: lang_code = "en"; break;
         default:
-            std::cerr << "Neplatna volba jazyka. Program bude ukoncen." << std::endl;
-            return 1;
+            std::cout << translations["cz"]["invalid_choice"] << std::endl;
+            lang_code = "cz";
+            break;
     }
 
-    int count;
-    std::cout << prompt_count << std::endl;
-    std::cin >> count;
-
-    if (count <= 0) {
-        std::cerr << error_input << std::endl;
+    std::cout << translations[lang_code]["enter_count"] << std::endl;
+    int n;
+    std::cin >> n;
+    if (n <= 0) {
+        std::cout << "Invalid number of probabilities." << std::endl;
         return 1;
     }
 
-    std::vector<double> probabilities;
-    for (int i = 0; i < count; ++i) {
+    std::vector<double> probabilities(n);
+    for (int i = 0; i < n; i++) {
+        printf((translations[lang_code]["enter_prob"] + "\n").c_str(), i + 1);
         double p;
-        std::cout << prompt_prob << std::endl;
         std::cin >> p;
         if (p < 0 || p > 100) {
-            std::cerr << error_input << std::endl;
+            std::cout << "Probability must be between 0 and 100." << std::endl;
             return 1;
         }
-        probabilities.push_back(p / 100.0);
+        probabilities[i] = p / 100.0; // převod na desetinné číslo
     }
 
-    double combined = 1.0;
-    for (double p : probabilities) {
-        combined *= p;
+    double result = 1.0;
+    for (auto& p : probabilities) {
+        result *= p;
     }
 
-    json result;
-    result["combined_probability"] = combined;
+    std::cout << translations[lang_code]["result"] << " " << std::fixed << std::setprecision(6) << (result * 100) << " %" << std::endl;
+
+    json j;
+    j["probability_percent"] = result * 100;
 
     std::ofstream file("result.json");
-    if (!file) {
-        std::cerr << "Chyba pri otevirani souboru result.json" << std::endl;
-        return 1;
+    if (file.is_open()) {
+        file << j.dump(4);
+        file.close();
+        std::cout << translations[lang_code]["json_saved"] << std::endl;
+    } else {
+        std::cout << "Failed to open result.json for writing." << std::endl;
     }
-    file << result.dump(4);
-    file.close();
 
-    std::cout << output_message << std::endl;
     return 0;
 }
